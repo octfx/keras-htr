@@ -1,11 +1,11 @@
 import os
 import argparse
-from keras_htr.generators import WordGenerator
-from keras_htr.models.htr_model import HTRModel
+from project.htr.generators import WordGenerator
+from project.htr.models.htr_model import HTRModel
 from tensorflow.keras.callbacks import Callback
-from keras_htr.char_table import CharTable
+from project.htr.char_table import CharTable
 import tensorflow as tf
-from keras_htr.loader import DataLoaderIAM
+from project.htr.loader import DataLoaderIAM
 
 
 def fix_gpu():

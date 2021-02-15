@@ -14,8 +14,9 @@ class HTRModel:
     image_height = 32
     image_width = 128
 
-    def __init__(self, label_count):
+    def __init__(self, label_count, model_path=None):
         self._label_count = label_count
+        self._model_path = model_path
 
         self._setup_layers()
 
@@ -164,11 +165,15 @@ class HTRModel:
         :param callbacks:
         :return:
         """
-        learning_rate = learning_rate or 0.0003
+        learning_rate = learning_rate or 0.001
         epochs = epochs or 100
         callbacks = callbacks or []
 
         training_model = self._make_train()
+
+        if os.path.exists(os.path.join(self._model_path, 'weights.h5')):
+            print("Using previously saved weights.")
+            training_model.weights.load_weights(os.path.join(self._model_path, 'weights.h5'))
 
         training_model.compile(
             optimizer=Adam(lr=learning_rate),

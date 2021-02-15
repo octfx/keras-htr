@@ -101,6 +101,9 @@ class Augmentor:
         if np.min(img) == 255:
             return Augmentor.preprocess(original, image_size, augment)
 
+        #if random.random() < 0.001:
+        #    cv2.imwrite('check/{}.png'.format(random.randint(100, 10000)), img)
+
         # convert to range [0, 1]
         img = img / 255.0
 

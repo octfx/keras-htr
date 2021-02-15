@@ -1,8 +1,8 @@
 import tensorflow as tf
 import argparse
-from keras_htr.char_table import CharTable
-from keras_htr.models.htr_model import HTRModel
-from keras_htr.preprocessor import Augmentor
+from project.htr import CharTable
+from project.htr.models import HTRModel
+from project.htr.preprocessor import Augmentor
 import numpy as np
 import cv2
 gpus = tf.config.list_physical_devices('GPU')
