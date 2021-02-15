@@ -8,10 +8,28 @@ class Augmentor:
 
     @staticmethod
     def preprocess(img, image_size, augment=False):
-        """put img into target img of size imgSize, transpose for TF and normalize gray-values"""
+        """
+        Augment an input image
+        - 33%: Rotate between -25° and 25°
+        - 33%: Affine translate on the x and y axis between -20% and 20%
+        - 33%: Rotation and Translation
 
-        def rand_odd():
-            return random.randint(1, 3) * 2 + 1
+        Images get binarized by using otsus method
+
+        Output image has a size of (128, 32)
+        Grayscale values are put into the range [0, 1]
+        :param img:
+        :param image_size:
+        :param augment:
+        :return:
+        """
+
+        rotation_range = (-25, 25)
+        scaling_range = (0.5, 1.5)
+
+        original = img.copy()
+
+        _, img = cv2.threshold(img, 0, 255, cv2.THRESH_BINARY + cv2.THRESH_OTSU)
 
         # there are damaged files in IAM dataset - just use black image instead
         if img is None:
@@ -19,21 +37,32 @@ class Augmentor:
 
         # data augmentation
         img = img.astype(np.float)
-        if augment:
-            # photometric data augmentation
-            if random.random() < 0.25:
-                img = cv2.GaussianBlur(img, (rand_odd(), rand_odd()), 0)
-            if random.random() < 0.25:
-                img = cv2.dilate(img, np.ones((3, 3)))
-            if random.random() < 0.25:
-                img = cv2.erode(img, np.ones((3, 3)))
-            if random.random() < 0.5:
-                img = img * (0.25 + random.random() * 0.75)
-            if random.random() < 0.25:
-                img = np.clip(img + (np.random.random(img.shape) - 0.5) * random.randint(1, 50), 0, 255)
-            if random.random() < 0.1:
-                img = 255 - img
 
+        if augment:
+            scale = 1
+            rotation = 0
+
+            if random.random() < 0.33:
+                rotation = random.randint(rotation_range[0], rotation_range[1])
+            if random.random() < 0.33:
+                scale = random.uniform(scaling_range[0], scaling_range[1])
+            if random.random() < 0.33:
+                rotation = random.randint(rotation_range[0], rotation_range[1])
+                scale = random.uniform(scaling_range[0], scaling_range[1])
+
+            M = cv2.getRotationMatrix2D(
+                (img.shape[0] // 2, img.shape[1] // 2),
+                angle=rotation,
+                scale=scale
+            )
+
+            img = cv2.warpAffine(
+                img,
+                M,
+                (img.shape[1], img.shape[0]),
+                borderMode=cv2.BORDER_CONSTANT,
+                borderValue=(255, 255, 255)
+            )
             # geometric data augmentation
             wt, ht = image_size
             h, w = img.shape
@@ -44,11 +73,8 @@ class Augmentor:
             # random position around center
             txc = (wt - w * fx) / 2
             tyc = (ht - h * fy) / 2
-            freedom_x = max((wt - fx * w) / 2, 0) + wt / 10
-            freedom_y = max((ht - fy * h) / 2, 0) + ht / 10
-            tx = txc + np.random.uniform(-freedom_x, freedom_x)
-            ty = tyc + np.random.uniform(-freedom_y, freedom_y)
-
+            tx = txc + np.random.uniform(-0.2, 0.2)
+            ty = tyc + np.random.uniform(-0.2, 0.2)
 
         # no data augmentation
         else:
@@ -61,10 +87,23 @@ class Augmentor:
 
         # map image into target image
         M = np.float32([[f, 0, tx], [0, f, ty]])
-        target = np.ones(image_size[::-1]) * 255 / 2
-        img = cv2.warpAffine(img, M, dsize=image_size, dst=target, borderMode=cv2.BORDER_TRANSPARENT)
 
-        # convert to range [-1, 1]
-        img = img / 255 - 0.5
+        target = np.ones(image_size[::-1]) * 255 / 2
+        img = cv2.warpAffine(
+            img,
+            M,
+            dsize=image_size,
+            dst=target,
+            borderMode=cv2.BORDER_CONSTANT,
+            borderValue=(255, 255, 255)
+        )
+
+        if np.min(img) == 255:
+            return Augmentor.preprocess(original, image_size, augment)
+
+        # convert to range [0, 1]
+        img = img / 255.0
+
+        assert np.min(img) >= 0 and np.max(img) <= 1
 
         return img

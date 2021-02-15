@@ -1,5 +1,4 @@
 import json
-import math
 import os
 
 import tensorflow as tf
@@ -12,15 +11,21 @@ from tensorflow import nn
 
 class HTRModel:
     lstm_units = 256
+    image_height = 32
+    image_width = 128
 
-    def __init__(self, label_count, height=32):
+    def __init__(self, label_count):
         self._label_count = label_count
-        self._height = height  # 32
 
-        self._setup_rnn_layers()
+        self._setup_layers()
 
     @staticmethod
     def create(model_path):
+        """
+        Create a model by loading weights from the specified path
+        :param model_path:
+        :return:
+        """
         model = HTRModel.load(model_path)
 
         return model
@@ -31,7 +36,7 @@ class HTRModel:
         Base
         Convolutional NN layers
         Feature Extraction
-        16 -> 256 Features
+        16 -> 80 Features
         :return:
         """
         num_layers = 5
@@ -41,15 +46,15 @@ class HTRModel:
 
         # Dropout (layers 2+)
         # Conv2D
+        # BatchNormalization
         # LeakyReLU
         # MaxPool (layers 1-3)
-        # BatchNormalization
         for idx in range(num_layers):
-            num_filters = 2 ** (idx + 4)  # 16 -> 256
+            num_filters = 16 * (idx + 1)  # 16 -> 80
             print(num_filters)
 
-            if idx > 2:
-                model.add(Dropout(rate=0.15))
+            if idx > 1:
+                model.add(Dropout(rate=0.2))
 
             if idx == 0:
                 model.add(
@@ -57,30 +62,41 @@ class HTRModel:
                         input_shape=(None, None, 1),
                         filters=num_filters,
                         kernel_size=kernel_size,
+                        strides=(1, 1),
                         padding='same',
                         activation=None
-                    ))
+                    )
+                )
             else:
-                model.add(Conv2D(filters=num_filters, kernel_size=kernel_size, padding='same', activation=None))
+                model.add(
+                    Conv2D(
+                        filters=num_filters,
+                        kernel_size=kernel_size,
+                        strides=(1, 1),
+                        padding='same',
+                        activation=None
+                    )
+                )
 
+            model.add(BatchNormalization())
             model.add(LeakyReLU())
 
             if idx < 3:
                 model.add(MaxPool2D())
 
-            model.add(BatchNormalization())
-
-        def concat(X):
+        def columnwise_concat(X):
             t = Concatenate(axis=1)(tf.unstack(X, axis=3))
             t = tf.transpose(t, [0, 2, 1])
 
             return t
 
-        model.add(Lambda(concat))
+        model.add(Lambda(columnwise_concat))
+
+        print(model.summary())
 
         return model
 
-    def _setup_rnn_layers(self):
+    def _setup_layers(self):
         """
         Recurrent NN Layers
         256 Features per Time Step
@@ -90,22 +106,19 @@ class HTRModel:
         num_layers = 5
 
         # Input grayscale images with height 32px and width 128px
-        self.input_layer = Input(shape=(self._height, None, 1))
+        self.input_layer = Input(shape=(self.image_height, self.image_width, 1))
 
         model = self.input_layer
         # Keras functional API
         model = self._create_conv_net()(model)
 
-        model = Dropout(rate=0.5)(model)
-        model = Bidirectional(LSTM(self.lstm_units, return_sequences=True))(model)
-
         for idx in range(num_layers):
-            model = Dropout(rate=0.5)(model)
-            model = Bidirectional(LSTM(self.lstm_units, return_sequences=True))(model)
+            model = Bidirectional(LSTM(self.lstm_units, return_sequences=True, dropout=0.5))(model)
 
         model = Dropout(rate=0.5)(model)
 
         self.output_layer = TimeDistributed(Dense(units=self._label_count + 1, activation='softmax'))(model)
+
         self.weights = Model(self.input_layer, self.output_layer)
 
     def _make_infer(self):
@@ -124,6 +137,7 @@ class HTRModel:
 
         def ctc_lambda_func(args):
             y_pred, labels, input_length, label_length = args
+
             return CtcBatchCost(labels, y_pred, input_length, label_length)
 
         labels = Input(name='the_labels', shape=[None], dtype=tf.float32)
@@ -141,10 +155,16 @@ class HTRModel:
         )
 
     def fit(self, train_data, validation_data, epochs, learning_rate, callbacks):
-        steps_per_epoch = math.ceil(train_data.size / train_data.batch_size)
-        val_steps = math.ceil(validation_data.size / validation_data.batch_size)
-
-        learning_rate = learning_rate or 0.001
+        """
+        Fit the model to the provided training data
+        :param train_data:
+        :param validation_data:
+        :param epochs:
+        :param learning_rate:
+        :param callbacks:
+        :return:
+        """
+        learning_rate = learning_rate or 0.0003
         epochs = epochs or 100
         callbacks = callbacks or []
 
@@ -157,30 +177,22 @@ class HTRModel:
 
         training_model.fit(
             train_data.__iter__(),
-            steps_per_epoch=steps_per_epoch,
+            steps_per_epoch=train_data.size,
             validation_data=validation_data.__iter__(),
-            validation_steps=val_steps,
+            validation_steps=validation_data.size,
             epochs=epochs,
             callbacks=callbacks
         )
 
-    def get_preprocessor(self):
-        from keras_htr.preprocessing import Cnn1drnnCtcPreprocessor
-        preprocessor = Cnn1drnnCtcPreprocessor()
-        # preprocessor.configure(**self._preprocessing_options)
-        return preprocessor
-
-    def get_adapter(self):
-        from ..adapters.cnn_1drnn_ctc_adapter import CTCAdapter
-        return CTCAdapter()
-
     def predict(self, inputs):
         X, input_lengths = inputs
-        #X = inputs
+        # X = inputs
+        print(input_lengths)
 
         prediction = self._make_infer().predict(X)
 
         labels = decode_greedy(prediction, input_lengths)
+        # labels = beam_search_decode(prediction, input_lengths)
 
         return labels
 
@@ -210,21 +222,47 @@ class HTRModel:
         params_path = os.path.join(path, 'params.json')
         weights_path = os.path.join(path, 'weights.h5')
 
+        assert os.path.exists(params_path)
+        assert os.path.exists(weights_path)
+
         with open(params_path) as f:
             s = f.read()
 
         param_data = json.loads(s)
 
-        instance = cls(label_count=param_data['params']['label_count'], height=32)  # TODO change height
+        instance = cls(label_count=param_data['params']['label_count'])
 
         instance.weights.load_weights(weights_path)
         return instance
 
 
-@tf.function
 def decode_greedy(inputs, input_lengths):
+    with tf.compat.v1.Session() as sess:
+        inputs = tf.transpose(inputs, [1, 0, 2])
+        print(inputs)
+        print(input_lengths.flatten())
+        decoded, _ = tf.nn.ctc_greedy_decoder(inputs, input_lengths.flatten())
+
+        dense = tf.sparse.to_dense(decoded[0])
+        res = sess.run(dense)
+        return res
+
+
+def beam_search_decode(inputs, input_lengths):
+    with tf.compat.v1.Session() as sess:
+        inputs = tf.transpose(inputs, [1, 0, 2])
+        decoded, log_probs = tf.nn.ctc_beam_search_decoder(inputs, input_lengths.flatten(), beam_width=50)
+        print(log_probs)
+        dense = tf.sparse.to_dense(decoded[0])
+        res = sess.run(dense)
+        return res
+
+
+@tf.function
+def decode_greed2y(inputs, input_lengths):
     inputs = tf.transpose(inputs, [1, 0, 2])
-    decoded, _ = nn.ctc_greedy_decoder(inputs, input_lengths.flatten())
+
+    decoded, _ = nn.ctc_greedy_decoder(inputs, input_lengths)
 
     dense = tf.sparse.to_dense(decoded[0])
 
@@ -232,9 +270,9 @@ def decode_greedy(inputs, input_lengths):
 
 
 @tf.function
-def beam_search_decode(inputs, input_lengths):
+def beam_search_d2ecode(inputs, input_lengths):
     inputs = tf.transpose(inputs, [1, 0, 2])
-    decoded, log_probs = nn.ctc_beam_search_decoder(inputs, input_lengths.flatten(), beam_width=10)
+    decoded, log_probs = nn.ctc_beam_search_decoder(inputs, input_lengths.flatten(), beam_width=50)
     print(log_probs)
     dense = tf.sparse.to_dense(decoded[0])
 

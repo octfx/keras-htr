@@ -3,8 +3,10 @@ import random
 
 
 class DataLoaderIAM:
-    """loads data which corresponds to IAM format, see:
-    http://www.fki.inf.unibe.ch/databases/iam-handwriting-database """
+    """
+    loads data which corresponds to IAM format, see:
+    http://www.fki.inf.unibe.ch/databases/iam-handwriting-database
+    """
 
     _train_samples = None
     _validation_samples = None
@@ -27,7 +29,7 @@ class DataLoaderIAM:
     def __init__(self, data_dir):
         """loader for dataset at given location, preprocess images and text according to parameters"""
 
-        max_text_len = 32  # Max length for a word
+        max_text_len = 16  # Max length for a word
 
         assert os.path.isdir(os.path.join(data_dir, 'img'))
 
@@ -90,10 +92,9 @@ class DataLoaderIAM:
 
     def split_dataset(self):
         """Split the dataset into training and validation"""
-        split_index = int(0.015 * len(self.samples))
+        split_index = int(0.95 * len(self.samples))
         self._train_samples = self.samples[:split_index]
-        # TODO
-        self._validation_samples = self.samples[len(self.samples) - split_index:]
+        self._validation_samples = self.samples[split_index:]
 
     def get_train_samples(self):
         random.shuffle(self._train_samples)

@@ -3,6 +3,11 @@ import io
 
 
 def load_characters(path):
+    """
+    Load characters from the characters.txt file
+    :param path:
+    :return:
+    """
     char_to_label = {}
     label_to_char = {}
 
@@ -19,6 +24,9 @@ def load_characters(path):
 
 
 class CharTable:
+    """
+    The character table holds all occuring characters in the dataset and labels them numerically
+    """
     def __init__(self, characters_list_path):
         assert os.path.exists(characters_list_path)
 
@@ -28,24 +36,11 @@ class CharTable:
 
     @property
     def size(self):
-        return len(self._char_to_label) + 2
-
-    @property
-    def sos(self):
-        return self._max_label + 1
-
-    @property
-    def eos(self):
-        return self.sos + 1
+        """All characters + blank"""
+        return len(self._char_to_label) + 1
 
     def get_label(self, ch):
         return self._char_to_label[ch]
 
     def get_character(self, class_label):
-        if class_label == self.sos:
-            return ''
-
-        if class_label == self.eos:
-            return '\n'
-
         return self._label_to_char[class_label]
