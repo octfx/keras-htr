@@ -7,7 +7,7 @@ if __name__ == '__main__':
     parser.add_argument('model', type=str)
     parser.add_argument('char_table', type=str)
     parser.add_argument('image', type=str)
-    parser.add_argument('--raw', type=bool, default=False)
+    parser.add_argument('--mode', type=str, default='Greedy',)
 
     args = parser.parse_args()
 
@@ -16,6 +16,15 @@ if __name__ == '__main__':
     char_table_path = args.char_table
     raw = args.raw
 
-    res = predict(model_path=model_path, char_table=char_table_path, image=image_path)
+    res = predict(
+        model_path=model_path,
+        char_table=char_table_path,
+        image=image_path,
+        decode_mode=args.mode
+    )
 
-    print('Recognized text: "{}"'.format(res))
+    for key in res:
+        if type(key) == int:
+            continue
+
+        print('Recognized text ({}): "{}"'.format(key, res[key]))

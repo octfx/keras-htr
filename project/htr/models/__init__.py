@@ -24,7 +24,7 @@ def limit_gpu_memory(max_vram_mb=4096):
             print(e)
 
 
-def predict(model_path, char_table, image):
+def predict(model_path, char_table, image, decode_mode='Greedy'):
     limit_gpu_memory(1024)
 
     assert os.path.exists(model_path), "Model path not found"
@@ -43,6 +43,9 @@ def predict(model_path, char_table, image):
 
     input_lengths = np.array(16, dtype=np.int32).reshape(1, 1)
 
-    labels = model.predict([X, input_lengths])[0]
+    labels = model.predict(
+        [X, input_lengths],
+        decode_mode=decode_mode
+    )[0]
 
     return ''.join([char_table.get_character(label) for label in labels])

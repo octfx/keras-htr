@@ -197,12 +197,33 @@ class HTRModel:
             batch_size=batch_size
         )
 
-    def predict(self, inputs):
+    def predict(self, inputs, decode_mode='Greedy'):
         image, input_lengths = inputs
         prediction = self._make_infer().predict(image)
 
-        labels = greedy_decode(prediction, input_lengths)
-        # labels = beam_search_decode(prediction, input_lengths)
+        if decode_mode == 'Greedy':
+            res = greedy_decode(prediction, input_lengths)
+            labels = dict({
+                0: res,
+                'greedy': res
+            })
+        elif decode_mode == 'Beam':
+            res = beam_search_decode(prediction, input_lengths)
+            labels = dict({
+                0: res,
+                'beam': res
+            })
+        elif decode_mode == 'Both':
+            greedy = greedy_decode(prediction, input_lengths)
+            beam = beam_search_decode(prediction, input_lengths)
+            labels = dict({
+                0: greedy,
+                1: beam,
+                'beam': beam,
+                'greedy': greedy,
+            })
+        else:
+            raise ValueError('Type not defined')
 
         return labels
 
