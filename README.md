@@ -1,4 +1,9 @@
 # IBV NN OCR
+Activate the conda environment:
+```shell
+conda env create -f env.yml
+conda env activate ibv-ocr
+```
 
 ## Training
 This requires the presence of the IAM dataset. You can download it here: https://fki.tic.heia-fr.ch/databases/iam-handwriting-database
