@@ -33,7 +33,7 @@ class DataLoaderIAM:
         :param data_dir:
         """
 
-        max_text_len = 16  # Max length for a word
+        max_text_len = 16  # Max length for a word (label)
 
         assert os.path.isdir(os.path.join(data_dir, 'img'))
 

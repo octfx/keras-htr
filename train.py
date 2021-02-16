@@ -5,30 +5,15 @@ import lmdb
 import pickle
 from project.htr.word_generator import WordGenerator
 from project.htr.models.htr_model import HTRModel
+from project.htr.models import limit_gpu_memory
 from tensorflow.keras.callbacks import Callback
 from project.htr.char_table import CharTable
-import tensorflow as tf
 from project.htr.loader import DataLoaderIAM
 from path import Path
 
 #
 # python train.py --model_path=model --learning_rate=0.001 --augment=true --epochs=80 --batch_size=10
 #
-
-
-def limit_gpu_memory(max_vram_mb=4096):
-    gpus = tf.config.experimental.list_physical_devices('GPU')
-    if gpus:
-        # Restrict TensorFlow to only allocate 1GB of memory on the first GPU
-        try:
-            tf.config.experimental.set_virtual_device_configuration(
-                gpus[0],
-                [tf.config.experimental.VirtualDeviceConfiguration(memory_limit=max_vram_mb)])
-            logical_gpus = tf.config.experimental.list_logical_devices('GPU')
-            print(len(gpus), "Physical GPUs,", len(logical_gpus), "Logical GPUs")
-        except RuntimeError as e:
-            # Virtual devices must be set before GPUs have been initialized
-            print(e)
 
 
 class SaveModelCallback(Callback):

@@ -5,7 +5,7 @@ from tkinter import filedialog
 import cv2
 from PIL import ImageTk, Image
 
-from ..htr.models.htr_model import HTRModel
+from ..htr.models import predict
 from ..htr.preprocessor.image_augmentor import Augmentor
 
 
@@ -17,7 +17,7 @@ class HtrGui:
         assert os.path.exists(model_path)
 
         self.root = Tk(className="HTR Gui")
-        self.model = HTRModel.load('./model_path')
+        self._model_path = model_path
 
         self.set_geometry()
         self.add_controls()
@@ -48,13 +48,17 @@ class HtrGui:
         self.image_augmented = Label(image=None)
         self.image_augmented.pack(fill=BOTH)
 
+        self.status_text_content = StringVar()
+        self.status_text = Label(self.root, textvariable=self.status_text_content)
+        self.status_text.pack()
+
         self.result_text_content = StringVar()
         self.result_text = Label(self.root, textvariable=self.result_text_content)
         self.result_text.pack()
 
     def browse_files(self):
         filename = filedialog.askopenfilename(
-            initialdir="/",
+            initialdir=os.getcwd(),
             title="Wähle Bild mit Text",
             filetypes=(
                 ("Images", ".jpg .png"),
@@ -65,8 +69,8 @@ class HtrGui:
         if len(filename) == 0:
             return
 
-        cv_image = cv2.imread(filename, 0)
-        augmented = Augmentor.preprocess(img=cv_image, image_size=(128, 32), augment=False)
+        cv_image = cv2.imread(filename, cv2.IMREAD_GRAYSCALE)
+        augmented = Augmentor.preprocess(img=cv_image, image_size=(128, 32), augment=False, binarize=True)
 
         self.image_input = augmented
 
@@ -92,9 +96,20 @@ class HtrGui:
         self.augmented_image_label_result_text.set("Eingabebild in das NN:")
 
         self.root.update_idletasks()
-        self.ocr()
+        self.htr()
 
-    def ocr(self):
-        labels = self.model.predict(self.image_input)
-        self.result_text_content.set(labels)
+    def htr(self):
+        self.status_text_content.set("Erkenne Text...")
+        self.result_text_content.set("")
+        self.root.update_idletasks()
+
+        res = predict(
+            model_path=self._model_path,
+            char_table=os.path.join(os.getcwd(), 'temp_ds', 'characters.txt'),
+            image=self.image_input
+        )
+
+        self.status_text_content.set("Erkannter Text:")
+        self.result_text_content.set(res)
         self.image_input = None
+        self.root.update_idletasks()

@@ -1,3 +1,4 @@
+import math
 import os
 
 import tensorflow as tf
@@ -86,11 +87,11 @@ class HTRModel:
             if idx < 3:
                 model.add(MaxPool2D())
 
-        def columnwise_concat(X):
-            t = Concatenate(axis=1)(tf.unstack(X, axis=3))
-            t = tf.transpose(t, [0, 2, 1])
+        def columnwise_concat(layer):
+            transposed = Concatenate(axis=1)(tf.unstack(layer, axis=3))
+            transposed = tf.transpose(transposed, [0, 2, 1])
 
-            return t
+            return transposed
 
         model.add(Lambda(columnwise_concat))
 
@@ -119,7 +120,7 @@ class HTRModel:
 
         model = Dropout(rate=0.5)(model)
 
-        self.output_layer = TimeDistributed(Dense(units=self._label_count + 1, activation='softmax'))(model)
+        self.output_layer = TimeDistributed(Dense(units=self._label_count, activation='softmax'))(model)
 
         self.weights = Model(self.input_layer, self.output_layer)
 
@@ -167,6 +168,9 @@ class HTRModel:
         :param callbacks:
         :return:
         """
+        steps_per_epoch = math.ceil(train_data.size / train_data.batch_size)
+        val_steps = math.ceil(validation_data.size / validation_data.batch_size)
+
         learning_rate = learning_rate or 0.001
         epochs = epochs or 100
         callbacks = callbacks or []
@@ -174,6 +178,7 @@ class HTRModel:
         training_model = self._make_train()
 
         if self._model_path is not None and os.path.exists(os.path.join(self._model_path, 'weights.h5')):
+            # If previously saved weights are available, further train on them
             print("Using previously saved weights.")
             training_model.load_weights(os.path.join(self._model_path, 'weights.h5'))
 
@@ -184,9 +189,9 @@ class HTRModel:
 
         training_model.fit(
             train_data.__iter__(),
-            steps_per_epoch=train_data.size,
+            steps_per_epoch=steps_per_epoch,
             validation_data=validation_data.__iter__(),
-            validation_steps=validation_data.size,
+            validation_steps=val_steps,
             epochs=epochs,
             callbacks=callbacks,
             batch_size=batch_size
@@ -194,28 +199,25 @@ class HTRModel:
 
     def predict(self, inputs):
         image, input_lengths = inputs
-        # X = inputs
-        print(input_lengths)
-
         prediction = self._make_infer().predict(image)
 
-        labels = decode_greedy(prediction, input_lengths)
+        labels = greedy_decode(prediction, input_lengths)
         # labels = beam_search_decode(prediction, input_lengths)
 
         return labels
 
     def save(self, path):
+        """
+        Writes the computed weights to disk
+        :param path:
+        :return:
+        """
         if not os.path.exists(path):
             os.mkdir(path)
 
         weights_path = os.path.join(path, 'weights.h5')
 
         self.weights.save_weights(weights_path)
-
-        inference_model = self._make_infer()
-
-        inference_model_path = os.path.join(path, 'inference_model.h5')
-        inference_model.save(inference_model_path)
 
     @classmethod
     def load(cls, path):
@@ -229,44 +231,28 @@ class HTRModel:
         return instance
 
 
-def decode_greedy(inputs, input_lengths):
-    with tf.compat.v1.Session() as sess:
-        inputs = tf.transpose(inputs, [1, 0, 2])
-        print(inputs)
-        print(input_lengths.flatten())
-        decoded, _ = tf.nn.ctc_greedy_decoder(inputs, input_lengths.flatten())
-
-        dense = tf.sparse.to_dense(decoded[0])
-        res = sess.run(dense)
-        return res
-
-
 def beam_search_decode(inputs, input_lengths):
     with tf.compat.v1.Session() as sess:
-        inputs = tf.transpose(inputs, [1, 0, 2])
-        decoded, log_probs = tf.nn.ctc_beam_search_decoder(inputs, input_lengths.flatten(), beam_width=50)
-        print(log_probs)
+        decoded, _ = nn.ctc_beam_search_decoder(
+            inputs=tf.transpose(inputs, [1, 0, 2]),
+            sequence_length=input_lengths.flatten(),
+            beam_width=10,
+            merge_repeated=True
+        )
+
         dense = tf.sparse.to_dense(decoded[0])
         res = sess.run(dense)
         return res
 
 
-@tf.function
-def decode_greed2y(inputs, input_lengths):
-    inputs = tf.transpose(inputs, [1, 0, 2])
+def greedy_decode(inputs, input_lengths):
+    with tf.compat.v1.Session() as sess:
+        decoded, _ = nn.ctc_greedy_decoder(
+            inputs=tf.transpose(inputs, [1, 0, 2]),
+            sequence_length=input_lengths.flatten(),
+            merge_repeated=True
+        )
 
-    decoded, _ = nn.ctc_greedy_decoder(inputs, input_lengths)
-
-    dense = tf.sparse.to_dense(decoded[0])
-
-    return dense.numpy()
-
-
-@tf.function
-def beam_search_d2ecode(inputs, input_lengths):
-    inputs = tf.transpose(inputs, [1, 0, 2])
-    decoded, log_probs = nn.ctc_beam_search_decoder(inputs, input_lengths.flatten(), beam_width=50)
-    print(log_probs)
-    dense = tf.sparse.to_dense(decoded[0])
-
-    return dense.numpy()
+        dense = tf.sparse.to_dense(decoded[0])
+        res = sess.run(dense)
+        return res

@@ -7,12 +7,12 @@ import numpy as np
 class Augmentor:
 
     @staticmethod
-    def preprocess(img, image_size, augment=False):
+    def preprocess(img, image_size, augment=False, binarize=False):
         """
         Augment an input image
         - 33%: Rotate between -25° and 25°
         - 33%: Affine translate on the x and y axis between -20% and 20%
-        - 10%: Rotation and Translation
+        - 33%: Rotation and Translation
 
         Images get binarized by using otsus method
 
@@ -32,9 +32,15 @@ class Augmentor:
         if img is None:
             img = np.zeros(image_size[::-1])
 
+        if binarize:
+            # Binarization flag is usually set when preprocessing an image for inference
+            # Images in lmdb are already thresholded
+            _, img = cv2.threshold(img, 0, 255, cv2.THRESH_BINARY + cv2.THRESH_OTSU)
+
         img = img.astype(np.float)
 
         if augment:
+            # Augmentation is usually done when training the network
             scale = 1
             scale_done = False
             rotation = 0
@@ -52,12 +58,14 @@ class Augmentor:
                 if not scale_done:
                     scale = random.uniform(scaling_range[0], scaling_range[1])
 
+            # The matrix used for rotation and scaling
             M = cv2.getRotationMatrix2D(
                 (img.shape[0] // 2, img.shape[1] // 2),
                 angle=rotation,
                 scale=scale
             )
 
+            # The image is rotated and scaled
             img = cv2.warpAffine(
                 img,
                 M,
@@ -109,6 +117,6 @@ class Augmentor:
         # convert to range [0, 1]
         img = img / 255.0
 
-        # assert np.min(img) >= 0 and np.max(img) <= 1
+        assert np.min(img) >= 0 and np.max(img) <= 1, "Image not in range [0, 1]. How could this happen"
 
         return img
