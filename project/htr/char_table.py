@@ -1,5 +1,5 @@
-import os
 import io
+import os
 
 
 def load_characters(path):
@@ -27,6 +27,7 @@ class CharTable:
     """
     The character table holds all occuring characters in the dataset and labels them numerically
     """
+
     def __init__(self, characters_list_path):
         assert os.path.exists(characters_list_path)
 

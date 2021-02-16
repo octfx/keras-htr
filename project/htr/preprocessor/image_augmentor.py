@@ -12,7 +12,7 @@ class Augmentor:
         Augment an input image
         - 33%: Rotate between -25° and 25°
         - 33%: Affine translate on the x and y axis between -20% and 20%
-        - 33%: Rotation and Translation
+        - 10%: Rotation and Translation
 
         Images get binarized by using otsus method
 
@@ -29,26 +29,28 @@ class Augmentor:
 
         original = img.copy()
 
-        _, img = cv2.threshold(img, 0, 255, cv2.THRESH_BINARY + cv2.THRESH_OTSU)
-
-        # there are damaged files in IAM dataset - just use black image instead
         if img is None:
             img = np.zeros(image_size[::-1])
 
-        # data augmentation
         img = img.astype(np.float)
 
         if augment:
             scale = 1
+            scale_done = False
             rotation = 0
+            rotation_done = False
 
             if random.random() < 0.33:
                 rotation = random.randint(rotation_range[0], rotation_range[1])
+                rotation_done = True
             if random.random() < 0.33:
                 scale = random.uniform(scaling_range[0], scaling_range[1])
+                scale_done = True
             if random.random() < 0.33:
-                rotation = random.randint(rotation_range[0], rotation_range[1])
-                scale = random.uniform(scaling_range[0], scaling_range[1])
+                if not rotation_done:
+                    rotation = random.randint(rotation_range[0], rotation_range[1])
+                if not scale_done:
+                    scale = random.uniform(scaling_range[0], scaling_range[1])
 
             M = cv2.getRotationMatrix2D(
                 (img.shape[0] // 2, img.shape[1] // 2),
@@ -63,27 +65,26 @@ class Augmentor:
                 borderMode=cv2.BORDER_CONSTANT,
                 borderValue=(255, 255, 255)
             )
-            # geometric data augmentation
-            wt, ht = image_size
-            h, w = img.shape
-            f = min(wt / w, ht / h)
+
+            target_width, target_height = image_size
+            original_height, original_width = img.shape
+            f = min(target_width / original_width, target_height / original_height)
             fx = f * np.random.uniform(0.75, 1.25)
             fy = f * np.random.uniform(0.75, 1.25)
 
             # random position around center
-            txc = (wt - w * fx) / 2
-            tyc = (ht - h * fy) / 2
+            txc = (target_width - original_width * fx) / 2
+            tyc = (target_height - original_height * fy) / 2
             tx = txc + np.random.uniform(-0.2, 0.2)
             ty = tyc + np.random.uniform(-0.2, 0.2)
 
-        # no data augmentation
         else:
             # center image
-            wt, ht = image_size
-            h, w = img.shape
-            f = min(wt / w, ht / h)
-            tx = (wt - w * f) / 2
-            ty = (ht - h * f) / 2
+            target_width, target_height = image_size
+            original_height, original_width = img.shape
+            f = min(target_width / original_width, target_height / original_height)
+            tx = (target_width - original_width * f) / 2
+            ty = (target_height - original_height * f) / 2
 
         # map image into target image
         M = np.float32([[f, 0, tx], [0, f, ty]])
@@ -99,14 +100,15 @@ class Augmentor:
         )
 
         if np.min(img) == 255:
+            # If the augemtation yields an empty image try again
             return Augmentor.preprocess(original, image_size, augment)
 
-        #if random.random() < 0.001:
+        # if random.random() < 0.001:
         #    cv2.imwrite('check/{}.png'.format(random.randint(100, 10000)), img)
 
         # convert to range [0, 1]
         img = img / 255.0
 
-        assert np.min(img) >= 0 and np.max(img) <= 1
+        # assert np.min(img) >= 0 and np.max(img) <= 1
 
         return img

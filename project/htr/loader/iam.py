@@ -27,7 +27,11 @@ class DataLoaderIAM:
         return text
 
     def __init__(self, data_dir):
-        """loader for dataset at given location, preprocess images and text according to parameters"""
+        """
+        Loads the IAM Dataset to lmdb
+        Splits the dataset into training and validation
+        :param data_dir:
+        """
 
         max_text_len = 16  # Max length for a word
 
@@ -76,7 +80,7 @@ class DataLoaderIAM:
 
         self.characters = sorted(list(character_vocabulary))
 
-        with open(os.path.join(data_dir, 'd.txt'), 'w') as f:
+        with open(os.path.join(data_dir, 'dict.txt'), 'w') as f:
             f.write(self.samples.__str__())
 
     def write_characters_to_disk(self):

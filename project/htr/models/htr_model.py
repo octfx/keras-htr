@@ -1,12 +1,11 @@
-import json
 import os
 
 import tensorflow as tf
+from tensorflow import nn
 from tensorflow.keras import Model, Sequential
 from tensorflow.keras.backend import ctc_batch_cost as CtcBatchCost
 from tensorflow.keras.layers import *
 from tensorflow.keras.optimizers import Adam
-from tensorflow import nn
 
 
 class HTRModel:
@@ -14,11 +13,13 @@ class HTRModel:
     image_height = 32
     image_width = 128
 
-    def __init__(self, label_count, model_path=None):
+    def __init__(self, label_count=80, model_path=None):
         self._label_count = label_count
         self._model_path = model_path
 
         self._setup_layers()
+        print("Summary:")
+        print(self.weights.summary())
 
     @staticmethod
     def create(model_path):
@@ -52,7 +53,7 @@ class HTRModel:
         # MaxPool (layers 1-3)
         for idx in range(num_layers):
             num_filters = 16 * (idx + 1)  # 16 -> 80
-            print(num_filters)
+            # print(num_filters)
 
             if idx > 1:
                 model.add(Dropout(rate=0.2))
@@ -93,8 +94,6 @@ class HTRModel:
 
         model.add(Lambda(columnwise_concat))
 
-        print(model.summary())
-
         return model
 
     def _setup_layers(self):
@@ -112,6 +111,8 @@ class HTRModel:
         model = self.input_layer
         # Keras functional API
         model = self._create_conv_net()(model)
+
+        model = Dropout(rate=0.5)(model)
 
         for idx in range(num_layers):
             model = Bidirectional(LSTM(self.lstm_units, return_sequences=True, dropout=0.5))(model)
@@ -155,9 +156,10 @@ class HTRModel:
             )([self.output_layer, labels, input_length, label_length])
         )
 
-    def fit(self, train_data, validation_data, epochs, learning_rate, callbacks):
+    def fit(self, train_data, validation_data, epochs, learning_rate, callbacks, batch_size):
         """
         Fit the model to the provided training data
+        :param batch_size:
         :param train_data:
         :param validation_data:
         :param epochs:
@@ -171,9 +173,9 @@ class HTRModel:
 
         training_model = self._make_train()
 
-        if os.path.exists(os.path.join(self._model_path, 'weights.h5')):
+        if self._model_path is not None and os.path.exists(os.path.join(self._model_path, 'weights.h5')):
             print("Using previously saved weights.")
-            training_model.weights.load_weights(os.path.join(self._model_path, 'weights.h5'))
+            training_model.load_weights(os.path.join(self._model_path, 'weights.h5'))
 
         training_model.compile(
             optimizer=Adam(lr=learning_rate),
@@ -186,15 +188,16 @@ class HTRModel:
             validation_data=validation_data.__iter__(),
             validation_steps=validation_data.size,
             epochs=epochs,
-            callbacks=callbacks
+            callbacks=callbacks,
+            batch_size=batch_size
         )
 
     def predict(self, inputs):
-        X, input_lengths = inputs
+        image, input_lengths = inputs
         # X = inputs
         print(input_lengths)
 
-        prediction = self._make_infer().predict(X)
+        prediction = self._make_infer().predict(image)
 
         labels = decode_greedy(prediction, input_lengths)
         # labels = beam_search_decode(prediction, input_lengths)
@@ -205,15 +208,7 @@ class HTRModel:
         if not os.path.exists(path):
             os.mkdir(path)
 
-        params_path = os.path.join(path, 'params.json')
         weights_path = os.path.join(path, 'weights.h5')
-
-        with open(params_path, 'w') as f:
-            f.write(json.dumps({
-                'params': dict(
-                    label_count=self._label_count
-                )
-            }))
 
         self.weights.save_weights(weights_path)
 
@@ -224,18 +219,11 @@ class HTRModel:
 
     @classmethod
     def load(cls, path):
-        params_path = os.path.join(path, 'params.json')
         weights_path = os.path.join(path, 'weights.h5')
 
-        assert os.path.exists(params_path)
         assert os.path.exists(weights_path)
 
-        with open(params_path) as f:
-            s = f.read()
-
-        param_data = json.loads(s)
-
-        instance = cls(label_count=param_data['params']['label_count'])
+        instance = cls()
 
         instance.weights.load_weights(weights_path)
         return instance

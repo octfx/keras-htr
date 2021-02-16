@@ -1,29 +1,69 @@
+import os
+import pickle
 import random
-import cv2
-from .preprocessor.image_augmentor import Augmentor
+
+import lmdb
 import numpy as np
+from path import Path
+
+from .preprocessor.image_augmentor import Augmentor
 
 
 def compute_input_lengths(image_arrays):
-    batch_size = len(image_arrays)
-    return np.array(16, dtype=np.int32).reshape(batch_size, 1)
+    lstm_input_shapes = [a.shape[1] // 8 for a in image_arrays]
+
+    return np.array(
+        lstm_input_shapes,
+        dtype=np.int32
+    ).reshape(
+        len(image_arrays),
+        1
+    )
+
+
+def pad_labellings(labels):
+    """
+    Zero pads all input labels to the longest one provided
+    :param labels:
+    :return:
+    """
+    target_length = max([len(labels) for labels in labels])
+    padded = []
+
+    for label in labels:
+        padding_size = target_length - len(label)
+
+        padded_label = label + [0] * padding_size
+
+        assert len(padded_label) > 0
+
+        padded.append(padded_label)
+
+    return padded
 
 
 def adapt_batch(batch):
+    """
+    Returns batchdata in the form of
+    :param batch:
+    :return:
+    """
     image_arrays, labellings = batch
 
     current_batch_size = len(labellings)
 
-    X = np.array(image_arrays).reshape(current_batch_size, *image_arrays[0].shape)
+    images = np.array(image_arrays).reshape(current_batch_size, *image_arrays[0].shape)
 
-    labels = np.array(labellings, dtype=np.int32).reshape(current_batch_size, -1)
+    padded_labellings = pad_labellings(labellings)
+
+    labels = np.array(padded_labellings, dtype=np.int32).reshape(current_batch_size, -1)
 
     input_lengths = compute_input_lengths(image_arrays)
 
     label_lengths = np.array([len(labelling) for labelling in labellings],
                              dtype=np.int32).reshape(current_batch_size, 1)
 
-    return [X, labels, input_lengths, label_lengths], labels
+    return [images, labels, input_lengths, label_lengths], labels
 
 
 class WordGenerator:
@@ -40,6 +80,10 @@ class WordGenerator:
         self._augment = augment
 
         self._indices = list(range(len(samples)))
+
+        assert os.path.isdir(os.path.join('lmdb'))
+
+        self.env = lmdb.open('lmdb', readonly=True)
 
     @property
     def batch_size(self):
@@ -73,8 +117,20 @@ class WordGenerator:
             yield image_arrays, labellings
 
     def get_dataset(self, line_index):
+        """
+        Retrieves data for usage in batches
+        Images are loaded from lmdb
+        :param line_index:
+        :return:
+        """
         sample = self._samples[line_index]
-        x = Augmentor.preprocess(cv2.imread(sample['file_path'], cv2.IMREAD_GRAYSCALE), (128, 32), self._augment)
+
+        with self.env.begin() as txn:
+            basename = Path(sample['file_path']).basename()
+            data = txn.get(basename.encode("ascii"))
+            img = pickle.loads(data)
+
+        x = Augmentor.preprocess(img, (128, 32), self._augment)
         y = [self._char_table.get_label(ch) for ch in sample['text']]
 
         return x, y
