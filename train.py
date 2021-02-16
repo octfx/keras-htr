@@ -1,18 +1,21 @@
-import os
 import argparse
-import cv2
-import lmdb
+import os
 import pickle
-from project.htr.word_generator import WordGenerator
-from project.htr.models.htr_model import HTRModel
-from project.htr.models import limit_gpu_memory
+
+import cv2
+from path import Path
 from tensorflow.keras.callbacks import Callback
+
+import lmdb
 from project.htr.char_table import CharTable
 from project.htr.loader import DataLoaderIAM
-from path import Path
+from project.htr.models import limit_gpu_memory
+from project.htr.models.htr_model import HTRModel
+from project.htr.word_generator import WordGenerator
+
 
 #
-# python train.py --model_path=model --learning_rate=0.001 --augment=true --epochs=80 --batch_size=10
+# python train.py --model_path=model --learning_rate=0.001 --augment=true --epochs=100 --batch_size=150
 #
 
 

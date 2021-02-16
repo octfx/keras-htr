@@ -36,8 +36,9 @@ def predict(model_path, char_table, image, decode_mode='Greedy'):
 
     if type(image) == str:
         image = cv2.imread(image, cv2.IMREAD_GRAYSCALE)
-
-    img = Augmentor.preprocess(image, (128, 32), augment=False, binarize=True)
+        img = Augmentor.preprocess(image, (128, 32), augment=False, binarize=True)
+    else:
+        img = image
 
     X = np.array(img).reshape(1, *img.shape)
 

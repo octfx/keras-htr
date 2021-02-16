@@ -202,26 +202,9 @@ class HTRModel:
         prediction = self._make_infer().predict(image)
 
         if decode_mode == 'Greedy':
-            res = greedy_decode(prediction, input_lengths)
-            labels = dict({
-                0: res,
-                'greedy': res
-            })
+            labels = greedy_decode(prediction, input_lengths)
         elif decode_mode == 'Beam':
-            res = beam_search_decode(prediction, input_lengths)
-            labels = dict({
-                0: res,
-                'beam': res
-            })
-        elif decode_mode == 'Both':
-            greedy = greedy_decode(prediction, input_lengths)
-            beam = beam_search_decode(prediction, input_lengths)
-            labels = dict({
-                0: greedy,
-                1: beam,
-                'beam': beam,
-                'greedy': greedy,
-            })
+            labels = beam_search_decode(prediction, input_lengths)
         else:
             raise ValueError('Type not defined')
 
@@ -258,7 +241,6 @@ def beam_search_decode(inputs, input_lengths):
             inputs=tf.transpose(inputs, [1, 0, 2]),
             sequence_length=input_lengths.flatten(),
             beam_width=10,
-            merge_repeated=True
         )
 
         dense = tf.sparse.to_dense(decoded[0])

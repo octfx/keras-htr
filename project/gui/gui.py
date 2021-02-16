@@ -12,6 +12,7 @@ from ..htr.preprocessor.image_augmentor import Augmentor
 class HtrGui:
     root = None
     model = None
+    image_input = None
 
     def __init__(self, model_path):
         assert os.path.exists(model_path)
@@ -64,6 +65,19 @@ class HtrGui:
         self.result_text = Label(self.root, textvariable=self.result_text_content)
         self.result_text.pack()
 
+        self.rerun = Button(
+            self.root,
+            text="Erkenne erneut",
+            command=self.rerun
+        )
+        self.rerun.pack()
+
+    def rerun(self):
+        if self.image_input is None:
+            return
+
+        self.htr()
+
     def browse_files(self):
         filename = filedialog.askopenfilename(
             initialdir=os.getcwd(),
@@ -87,10 +101,10 @@ class HtrGui:
         to_predict = ImageTk.PhotoImage(img)
 
         original = Image.open(filename)
-        # Target Width = 200
-        # ImageW * x = 200
-        # 300 / ImageW = x
-        x = 300 / original.size[0]
+        # Target Width = 128
+        # ImageW * x = 128
+        # 128 / ImageW = x
+        x = 128 / original.size[0]
         original = original.resize((round(original.size[0] * x), round(original.size[1] * x)))
         original = ImageTk.PhotoImage(original)
 
@@ -103,12 +117,14 @@ class HtrGui:
         self.original_image_label_result_text.set("Eingabebild:")
         self.augmented_image_label_result_text.set("Eingabebild in das NN:")
 
+        self.root.update()
         self.root.update_idletasks()
         self.htr()
 
     def htr(self):
         self.status_text_content.set("Erkenne Text...")
         self.result_text_content.set("")
+        self.root.update()
         self.root.update_idletasks()
 
         decode_mode = self.decode_value.get()
@@ -119,12 +135,14 @@ class HtrGui:
 
         res = predict(
             model_path=self._model_path,
-            char_table=os.path.join(os.getcwd(), 'temp_ds', 'characters.txt'),
+            char_table=os.path.join(os.getcwd(), 'data', 'characters.txt'),
             image=self.image_input,
             decode_mode=decode_mode
         )
 
+        print('Recognized text ({}): "{}"'.format(decode_mode, res))
+
         self.status_text_content.set("Erkannter Text:")
-        self.result_text_content.set(res[0])
-        self.image_input = None
+        self.result_text_content.set(res)
+        self.root.update()
         self.root.update_idletasks()
