@@ -97,12 +97,11 @@ if __name__ == '__main__':
     parser.add_argument('--epochs', type=int, default=80)
     parser.add_argument('--batch_size', type=int, default=100)
     parser.add_argument('--augment', type=bool, default=False)
-
-    max_vram = 4096
+    parser.add_argument('--max_vram', type=int, default=409)
 
     args = parser.parse_args()
 
     create_db(args.data_source)
     dataloader = DataLoaderIAM(args.data_source)
-    limit_gpu_memory(max_vram)
+    limit_gpu_memory(args.max_vram)
     fit_model(args, dataloader)
