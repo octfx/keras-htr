@@ -91,7 +91,7 @@ def fit_model(args, dataloader):
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
-    parser.add_argument('--data_source', type=str, default='temp_ds')
+    parser.add_argument('--data_source', type=str, default='data')
     parser.add_argument('--model_path', type=str, default='model')
     parser.add_argument('--learning_rate', type=float, default=0.001)
     parser.add_argument('--epochs', type=int, default=80)
