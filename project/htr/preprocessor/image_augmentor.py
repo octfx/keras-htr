@@ -18,6 +18,7 @@ class Augmentor:
 
         Output image has a size of (128, 32)
         Grayscale values are put into the range [0, 1]
+        :param binarize:
         :param img:
         :param image_size:
         :param augment:

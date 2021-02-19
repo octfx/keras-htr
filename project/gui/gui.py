@@ -79,6 +79,7 @@ class HtrGui:
         self.htr()
 
     def browse_files(self):
+        self.status_text_content.set("")
         filename = filedialog.askopenfilename(
             initialdir=os.getcwd(),
             title="Wähle Bild mit Text",
@@ -92,6 +93,11 @@ class HtrGui:
             return
 
         cv_image = cv2.imread(filename, cv2.IMREAD_GRAYSCALE)
+
+        if cv_image is None:
+            self.status_text_content.set("Fehler beim Lesen des Bildes!")
+            return
+
         augmented = Augmentor.preprocess(img=cv_image, image_size=(128, 32), augment=False, binarize=True)
 
         self.image_input = augmented
