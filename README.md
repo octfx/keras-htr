@@ -15,6 +15,21 @@ python train.py --model_path=model --learning_rate=0.001 --augment=true --epochs
 
 On the first run, all images get loaded into lmdb for faster access.
 
+## Examples
+```shell
+python htr.py model data\characters.txt examples\are.png
+# -> are
+
+python htr.py model data\characters.txt examples\bild.png
+# -> Bild
+
+python htr.py model data\characters.txt examples\wind.png
+# -> wind (LER 0.25 w instead of W)
+
+python htr.py model data\characters.txt examples\wort.png
+# -> work (LER 0.25 k instead of t)
+```
+
 ## Gui
 Start the gui with
 
