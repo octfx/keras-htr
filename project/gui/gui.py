@@ -18,6 +18,7 @@ class HtrGui:
         assert os.path.exists(model_path)
 
         self.root = Tk(className="HTR Gui")
+        self.root.wm_title("HTR Gui")
         self._model_path = model_path
 
         self.set_geometry()
@@ -31,12 +32,12 @@ class HtrGui:
     def add_controls(self):
         self.button_explore = Button(
             self.root,
-            text="Wähle Bild mit Text",
+            text="Select image with handwritten text",
             command=self.browse_files
         )
         self.button_explore.pack()
 
-        Label(self.root, text="Dekodierungsmodus:").pack()
+        Label(self.root, text="Decoding mode:").pack()
 
         self.decode_value = StringVar(self.root)
         self.decode_value.set("Greedy")
@@ -67,7 +68,7 @@ class HtrGui:
 
         self.rerun = Button(
             self.root,
-            text="Erkenne erneut",
+            text="Re-Run Decoding",
             command=self.rerun
         )
         self.rerun.pack()
@@ -82,7 +83,7 @@ class HtrGui:
         self.status_text_content.set("")
         filename = filedialog.askopenfilename(
             initialdir=os.getcwd(),
-            title="Wähle Bild mit Text",
+            title="Select image with handwritten text",
             filetypes=(
                 ("Images", ".jpg .png"),
                 ("all files", "*.*")
@@ -95,7 +96,7 @@ class HtrGui:
         cv_image = cv2.imread(filename, cv2.IMREAD_GRAYSCALE)
 
         if cv_image is None:
-            self.status_text_content.set("Fehler beim Lesen des Bildes!")
+            self.status_text_content.set("Error readint the selected image!")
             return
 
         augmented = Augmentor.preprocess(img=cv_image, image_size=(128, 32), augment=False, binarize=True)
@@ -120,15 +121,15 @@ class HtrGui:
         self.image_original.configure(image=original)
         self.image_original.image = original
 
-        self.original_image_label_result_text.set("Eingabebild:")
-        self.augmented_image_label_result_text.set("Eingabebild in das NN:")
+        self.original_image_label_result_text.set("Input image:")
+        self.augmented_image_label_result_text.set("Input image into the network:")
 
         self.root.update()
         self.root.update_idletasks()
         self.htr()
 
     def htr(self):
-        self.status_text_content.set("Erkenne Text...")
+        self.status_text_content.set("Detecting text...")
         self.result_text_content.set("")
         self.root.update()
         self.root.update_idletasks()
@@ -148,7 +149,7 @@ class HtrGui:
 
         print('Recognized text ({}): "{}"'.format(decode_mode, res))
 
-        self.status_text_content.set("Erkannter Text:")
+        self.status_text_content.set("Recognized text:")
         self.result_text_content.set(res)
         self.root.update()
         self.root.update_idletasks()
